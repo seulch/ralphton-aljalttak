@@ -79,15 +79,18 @@ export async function runCommunityCrawlers(): Promise<RawCrawlData[]> {
 }
 
 export async function runPhase1Pipeline(): Promise<number> {
-  const [snsData, communityData] = await Promise.all([
+  let snsData: RawCrawlData[] = [];
+  let communityData: RawCrawlData[] = [];
+
+  await Promise.all([
     logCrawlRun("sns", "phase1_sns", async () => {
-      const data = await runSnsCrawlers();
-      return { itemsFound: data.reduce((s, d) => s + d.texts.length, 0) };
-    }).then(() => runSnsCrawlers()),
+      snsData = await runSnsCrawlers();
+      return { itemsFound: snsData.reduce((s, d) => s + d.texts.length, 0) };
+    }),
     logCrawlRun("community", "phase1_community", async () => {
-      const data = await runCommunityCrawlers();
-      return { itemsFound: data.reduce((s, d) => s + d.texts.length, 0) };
-    }).then(() => runCommunityCrawlers()),
+      communityData = await runCommunityCrawlers();
+      return { itemsFound: communityData.reduce((s, d) => s + d.texts.length, 0) };
+    }),
   ]);
 
   const allRawData = [...snsData, ...communityData];
@@ -98,7 +101,12 @@ export async function runPhase1Pipeline(): Promise<number> {
     return 0;
   }
 
-  const extracted = await extractProducts(withTexts);
+  // Try AI extraction first, fall back to keyword extraction
+  let extracted = await extractProducts(withTexts);
+  if (extracted.length === 0) {
+    console.error("[pipeline] AI extraction returned 0 products, using keyword fallback");
+    extracted = keywordExtract(withTexts);
+  }
   const deduplicated = deduplicateProducts(extracted);
 
   let stored = 0;
@@ -127,6 +135,66 @@ export async function runPhase1Pipeline(): Promise<number> {
   }
 
   return stored;
+}
+
+// Keyword-based fallback extractor when OpenAI is unavailable
+function keywordExtract(
+  rawData: RawCrawlData[]
+): Omit<import("@/types/database").Product, "id" | "created_at" | "last_crawled_at" | "image_url" | "source_url">[] {
+  const KNOWN_PRODUCTS: Record<string, { name: string; name_localized: string | null; direction: "us_to_kr" | "kr_to_us"; category: "food" | "beauty" | "health" | "tech" | "fashion" | "home"; is_country_exclusive: boolean; estimated_us_price: number | null; estimated_kr_price: number | null }> = {
+    "trader joe": { name: "Trader Joe's Products", name_localized: "트레이더조", direction: "us_to_kr", category: "food", is_country_exclusive: true, estimated_us_price: 5, estimated_kr_price: null },
+    "bath & body": { name: "Bath & Body Works", name_localized: "배쓰앤바디웍스", direction: "us_to_kr", category: "home", is_country_exclusive: true, estimated_us_price: 15, estimated_kr_price: null },
+    "costco": { name: "Costco Kirkland Products", name_localized: "코스트코 커클랜드", direction: "us_to_kr", category: "health", is_country_exclusive: true, estimated_us_price: 20, estimated_kr_price: null },
+    "sephora": { name: "Sephora Collection", name_localized: "세포라", direction: "us_to_kr", category: "beauty", is_country_exclusive: true, estimated_us_price: 15, estimated_kr_price: null },
+    "tylenol": { name: "Tylenol Extra Strength", name_localized: "타이레놀", direction: "us_to_kr", category: "health", is_country_exclusive: true, estimated_us_price: 9, estimated_kr_price: null },
+    "올리브영": { name: "Olive Young K-Beauty", name_localized: "올리브영", direction: "kr_to_us", category: "beauty", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 15000 },
+    "olive young": { name: "Olive Young K-Beauty", name_localized: "올리브영", direction: "kr_to_us", category: "beauty", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 15000 },
+    "김": { name: "Korean Roasted Seaweed", name_localized: "김", direction: "kr_to_us", category: "food", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 10000 },
+    "홍삼": { name: "Korean Red Ginseng", name_localized: "홍삼", direction: "kr_to_us", category: "health", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 50000 },
+    "다이소": { name: "Daiso Korea", name_localized: "다이소", direction: "kr_to_us", category: "home", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 3000 },
+    "마스크팩": { name: "Korean Sheet Masks", name_localized: "마스크팩", direction: "kr_to_us", category: "beauty", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 1500 },
+    "라면": { name: "Korean Ramen Variety", name_localized: "한국 라면", direction: "kr_to_us", category: "food", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 5000 },
+    "kbeauty": { name: "K-Beauty Skincare Set", name_localized: "케이뷰티", direction: "kr_to_us", category: "beauty", is_country_exclusive: true, estimated_us_price: null, estimated_kr_price: 20000 },
+  };
+
+  const allText = rawData.map((d) => d.texts.join(" ").toLowerCase()).join(" ");
+  const found = new Map<string, typeof KNOWN_PRODUCTS[string] & { score: number; source: string }>();
+
+  for (const [keyword, product] of Object.entries(KNOWN_PRODUCTS)) {
+    const regex = new RegExp(keyword, "gi");
+    const matches = allText.match(regex);
+    if (matches && matches.length > 0) {
+      const existing = found.get(product.name);
+      const score = Math.min(95, 50 + matches.length * 5 + (product.is_country_exclusive ? 25 : 0));
+      if (!existing || score > existing.score) {
+        const matchSource = rawData.find((d) =>
+          d.texts.some((t) => t.toLowerCase().includes(keyword))
+        );
+        found.set(product.name, {
+          ...product,
+          score,
+          source: matchSource?.source || "google",
+        });
+      }
+    }
+  }
+
+  return Array.from(found.values()).map((p) => ({
+    name: p.name,
+    name_localized: p.name_localized,
+    direction: p.direction,
+    category: p.category,
+    estimated_us_price: p.estimated_us_price,
+    estimated_kr_price: p.estimated_kr_price,
+    is_country_exclusive: p.is_country_exclusive,
+    tags: ["community_recommended" as const],
+    why_popular: `Frequently mentioned in ${p.source} discussions about cross-border gifts.`,
+    trending_score: p.score,
+    source: p.source as import("@/types/database").CrawlSource,
+    best_for_age: [] as string[],
+    best_for_interests: [] as string[],
+    best_for_relationship: [] as string[],
+  }));
 }
 
 export async function checkCrawlCooldown(): Promise<{
