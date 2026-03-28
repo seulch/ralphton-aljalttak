@@ -8,7 +8,6 @@
     "language": "TypeScript",
     "database": "Supabase (PostgreSQL)",
     "llm": "OpenAI GPT-4o",
-    "aiChat": "Vercel AI SDK (useChat hook for streaming)",
     "priceApi": "SerpAPI Google Shopping ($25 Starter, 1000 searches/mo)",
     "snsScraping": "Apify (free $5 credit — Reddit, TikTok, Instagram)",
     "currencyApi": "exchangerate-api.com (free)",
@@ -58,7 +57,7 @@
       "description": "Set up Next.js project with all dependencies and create + execute Supabase database schema.",
       "acceptanceCriteria": [
         "Next.js 15 App Router + TypeScript + Tailwind CSS v4 initialized with pnpm",
-        "All dependencies installed: openai, @supabase/supabase-js, serpapi, node-fetch, ai, @ai-sdk/react, @ai-sdk/openai",
+        "All dependencies installed: openai, @supabase/supabase-js, serpapi, node-fetch",
         "Supabase migration SQL for 5 tables: products, product_prices, crawl_runs, shopping_lists, shopping_list_items",
         "--- TABLE: products (Phase 1 output — trending products from communities) ---",
         "products: id (uuid PK default gen_random_uuid()), name (text NOT NULL), name_localized (text), direction (text NOT NULL CHECK in us_to_kr|kr_to_us), category (text NOT NULL CHECK in food|beauty|health|tech|fashion|home), estimated_us_price (numeric — rough price from crawl data, nullable), estimated_kr_price (numeric — rough price from crawl data, nullable), is_country_exclusive (boolean NOT NULL default false), tags (text[] default '{}' — values: sns_recommended|community_recommended), why_popular (text NOT NULL default ''), trending_score (int NOT NULL default 0 CHECK 1-100), source (text NOT NULL — which crawler: reddit|tiktok|instagram|youtube|google|naver), source_url (text), best_for_age (text[] default '{}'), best_for_interests (text[] default '{}'), best_for_relationship (text[] default '{}'), image_url (text), last_crawled_at (timestamptz default now()), created_at (timestamptz default now()), UNIQUE(name, direction)",
@@ -257,31 +256,11 @@
       "notes": "Country-exclusive badge and price links are the two most important visual elements. Judges will click Buy links."
     },
     {
-      "id": "US-011",
-      "title": "Interactive chat on results page",
-      "description": "Streaming chat interface for refining recommendations via natural language.",
-      "acceptanceCriteria": [
-        "Vercel AI SDK useChat hook with DefaultChatTransport",
-        "POST /api/chat streaming endpoint with product DB context + recipient profile",
-        "Chat knows the current recommendations and recipient",
-        "Supports: 'show me more beauty stuff', 'what's only available in Korea?', 'add this to my list'",
-        "Streaming typewriter effect",
-        "Collapsible panel, full-screen on mobile",
-        "Multi-turn conversation works (context preserved across messages)",
-        "Test: curl /api/chat with messages → verify text-delta streaming events",
-        "If useChat frontend broken, implement fallback with raw fetch + ReadableStream",
-        "Typecheck passes"
-      ],
-      "priority": 11,
-      "passes": false,
-      "notes": "Backend is confirmed working in previous tests (returns text-delta events). If frontend doesn't display responses, debug ChatPanel.tsx — the issue is likely in sendMessage or message.parts rendering."
-    },
-    {
       "id": "US-012",
       "title": "Shopping list with share link",
       "description": "Add-to-list functionality with Supabase persistence and shareable link.",
       "acceptanceCriteria": [
-        "Add to List button on product cards and chat inline cards",
+        "Add to List button on product cards",
         "Cart icon with count badge",
         "/list page: items with checkbox, quantity, remove, total cost (dual currency)",
         "Auto-save to Supabase via anonymous UUID",
@@ -316,11 +295,10 @@
       "title": "End-to-end smoke test",
       "description": "Verify full flow works with real data.",
       "acceptanceCriteria": [
-        "Full flow: / → direction → profile → recommendations → chat → prices → list → share",
+        "Full flow: / → direction → profile → recommendations → prices → list → share",
         "POST /api/crawl succeeds and stores > 0 products with is_country_exclusive flags and sns_recommended/community_recommended tags",
         "Recommendations show country-exclusive items at top",
         "Price links are real clickable URLs",
-        "Chat responds with streaming",
         "All API failures have fallbacks",
         "pnpm build succeeds, pnpm typecheck passes",
         "App runs on localhost:3000 with real data"

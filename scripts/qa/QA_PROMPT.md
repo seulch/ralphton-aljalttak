@@ -61,7 +61,7 @@ curl -s "https://SUPABASE_URL/rest/v1/crawl_runs?select=source,status&limit=20" 
 
 **D. Integration Tests**
 Test full user flows end-to-end:
-1. Landing → direction select → profile → recommendations → chat → prices → list → share
+1. Landing → direction select → profile → recommendations → prices → list → share
 2. Crawl pipeline → products in DB → shown on UI
 3. Price refresh → marketplace links → clickable
 
@@ -82,18 +82,6 @@ Test full user flows end-to-end:
 - Every product card should have marketplace price links
 - Click each "Buy →" link — verify it's a real URL (curl -sI → not 404)
 - Links must have target="_blank"
-
-**H. Chat Functionality**
-```bash
-# Test chat API directly
-curl -s -N -X POST http://localhost:3000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"show me beauty products"}],"direction":"us_to_kr"}' \
-  --max-time 15 | head -20
-
-# Verify streaming response
-# Should see text-delta events
-```
 
 ### 4. Write QA_TEST.md
 
@@ -152,7 +140,7 @@ If you find issues with the PRD itself (wrong acceptance criteria, missing requi
   ```
   ## PRD Changelog (QA)
   - [date] QA-001: Changed US-007 acceptance criteria — landing page must show product count even when 0
-  - [date] QA-002: Added missing requirement to US-010b — chat must handle Korean input
+  - [date] QA-002: Added missing requirement to US-010 — results page must handle Korean product names
   ```
 
 ### 6. Stop the app
@@ -180,5 +168,5 @@ Otherwise, end normally (QA loop will run again after Ralph fixes issues).
 - Be thorough — you are the last line of defense before demo
 - Country-exclusive products MUST dominate recommendations
 - Every buy link MUST be a real, clickable URL
-- Chat MUST respond to user messages with streaming
+- Price links MUST be real clickable store URLs
 - Do NOT skip tests. Run every single one.

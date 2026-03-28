@@ -1,6 +1,9 @@
 # AJT-gift — PRD
 
 Cross-border gift recommendation app for US-Korea travelers. Phase 1: Crawls SNS and communities to discover trending, country-exclusive gifts people actually recommend. Phase 2: Looks up prices and buy links from marketplaces ONLY for discovered products. Core value: gifts you can only get by traveling to that country.
+
+## Stories (13)
+
 ### US-001: Project scaffolding and Supabase schema
 Set up Next.js project with all dependencies and create + execute Supabase database schema.
 ---
@@ -30,9 +33,6 @@ AI personalizes and ranks products from DB, strongly favoring country-exclusive 
 ---
 ### US-010: Product recommendation results page with price links
 Display recommendations as cards with country-exclusive badges, price comparison links (Skyscanner-style), and AI reasons.
----
-### US-011: Interactive chat on results page
-Streaming chat interface for refining recommendations via natural language.
 ---
 ### US-012: Shopping list with share link
 Add-to-list functionality with Supabase persistence and shareable link.

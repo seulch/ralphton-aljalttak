@@ -92,11 +92,6 @@ For each story:
 - Globally available products (AirPods, Nike) → trending_score -= 20
 - Core value: gifts you can ONLY get by traveling there
 
-### Chat (Vercel AI SDK v6)
-- Backend: `streamText()` + `result.toUIMessageStreamResponse()`
-- Frontend: `useChat` from `@ai-sdk/react` with `DefaultChatTransport`
-- If frontend chat broken, test API with curl first (backend confirmed working)
-
 ### Price comparison
 - Every product card shows marketplace prices with clickable buy links (Skyscanner-style)
 - Links from SerpAPI Google Shopping `product_link` field
