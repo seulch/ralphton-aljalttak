@@ -13,9 +13,10 @@ const KR_WHITELIST = [
 interface ShoppingResult {
   title: string;
   price: number;
+  extracted_price: number;
   source: string;
-  link: string;
-  currency?: string;
+  product_link: string;
+  link?: string;
 }
 
 export async function lookupPrice(
@@ -41,13 +42,27 @@ export async function lookupPrice(
       shopping_results?: ShoppingResult[];
     };
 
-    const results = (data.shopping_results || [])
-      .filter((r) =>
-        whitelist.some((w) =>
-          r.source?.toLowerCase().includes(w.toLowerCase())
-        )
+    const allResults = data.shopping_results || [];
+
+    // Match against whitelist — check if source contains any whitelisted store name
+    const whitelisted = allResults.filter((r) =>
+      whitelist.some((w) => {
+        const src = (r.source || "").toLowerCase();
+        const store = w.toLowerCase();
+        return src.includes(store) || store.includes(src.split(" - ")[0]);
+      })
+    );
+
+    // If no whitelisted results, take top 3 from any source
+    const candidates = whitelisted.length > 0 ? whitelisted : allResults;
+
+    const results = candidates
+      .filter((r) => (r.extracted_price || r.price) > 0)
+      .sort(
+        (a, b) =>
+          (a.extracted_price || a.price || Infinity) -
+          (b.extracted_price || b.price || Infinity)
       )
-      .sort((a, b) => (a.price || Infinity) - (b.price || Infinity))
       .slice(0, 3);
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -55,9 +70,9 @@ export async function lookupPrice(
     return results.map((r, i) => ({
       country,
       store_name: r.source || "Unknown",
-      price: r.price,
+      price: r.extracted_price || r.price,
       currency: country === "us" ? "USD" : "KRW",
-      product_link: r.link || "#",
+      product_link: r.product_link || r.link || "#",
       rank: (i + 1) as 1 | 2 | 3,
       expires_at: expiresAt,
     }));
@@ -71,9 +86,9 @@ export async function refreshProductPrices(
   productId: string,
   productName: string,
   country: Country
-): Promise<void> {
+): Promise<number> {
   const prices = await lookupPrice(productName, country);
-  if (prices.length === 0) return;
+  if (prices.length === 0) return 0;
 
   // Enforce max 3: delete existing for this product+country
   await supabase
@@ -83,12 +98,15 @@ export async function refreshProductPrices(
     .eq("country", country);
 
   // Insert new
+  let inserted = 0;
   for (const p of prices) {
-    await supabase.from("product_prices").insert({
+    const { error } = await supabase.from("product_prices").insert({
       product_id: productId,
       ...p,
     });
+    if (!error) inserted++;
   }
+  return inserted;
 }
 
 export async function getCachedPrices(

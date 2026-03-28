@@ -15,16 +15,45 @@ Extract colors, spacing, font sizes, layout structure from the .pen file. The de
 
 To read design tokens from the file: `cat web-design.pen | jq '.. | select(.type == "frame" and .name == "PAGE_NAME")'`
 
-## FIRST: Check for QA feedback
+## Dual-mode operation: BUILD → QA WATCH
 
-1. Read `QA_TEST.md` if it exists — it contains test results and issues from the QA agent
-2. If QA_TEST.md has FAIL items, fix those BEFORE picking a new story
-3. Read `PRD.md` — QA may have updated it with fixes/changes (check changelog at bottom)
+Ralph operates in two phases:
 
-## THEN: Pick next story
-
+### Phase A: BUILD (initial)
 1. Read `scripts/ralph/prd.json` — find highest priority story where `passes: false`
-2. If all stories pass AND no QA issues remain, output `<promise>COMPLETE</promise>` and stop
+2. If stories remain, implement them (see workflow below)
+3. When ALL stories pass, transition to Phase B
+
+### Phase B: QA WATCH LOOP (runs indefinitely after build)
+After all stories pass, Ralph enters a persistent watch loop:
+
+```
+while true:
+  1. git pull origin main          # Get latest (QA agent pushes QA_TEST.md)
+  2. Read QA_TEST.md               # Check for new test results
+  3. If QA_TEST.md has CRIT or FAIL items:
+     a. Parse each failure (CRIT-xxx, FAIL-xxx)
+     b. Fix the code (follow implementation workflow below)
+     c. Run pnpm typecheck && pnpm build — must pass
+     d. git add, commit "fix: [CRIT-xxx/FAIL-xxx] description", push
+     e. Loop back to step 1 (QA agent will re-test on new commit)
+  4. If QA_TEST.md has ONLY PASS and WARN items (0 CRIT, 0 FAIL):
+     a. Output <promise>COMPLETE</promise> and stop
+  5. If no new QA_TEST.md changes detected:
+     a. Sleep 30s (use: sleep 30)
+     b. Loop back to step 1
+```
+
+**CRITICAL**: Do NOT output `<promise>COMPLETE</promise>` if QA_TEST.md has ANY CRIT or FAIL items. The loop only ends when QA is fully green.
+
+**Priority order for fixes**: CRIT > FAIL (HIGH) > FAIL (MEDIUM) > FAIL (LOW) > WARN
+
+## EVERY iteration: Check for QA feedback FIRST
+
+1. `git pull origin main`
+2. Read `QA_TEST.md` if it exists — it contains test results from the QA agent running in a separate session
+3. If QA_TEST.md has CRIT or FAIL items, fix those BEFORE picking a new story
+4. If all stories pass and QA has failures, you are in Phase B — fix QA failures
 
 ## Implementation workflow
 
@@ -130,5 +159,11 @@ OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, CRON_SE
 ```
 
 ## Stop condition
-If ALL stories pass AND no QA issues in QA_TEST.md:
+ONLY output the completion promise when BOTH conditions are met:
+1. ALL stories in prd.json have `passes: true`
+2. QA_TEST.md has ZERO CRIT and ZERO FAIL items (only PASS and WARN)
+
+If either condition is false, keep working. If stories are done but QA has failures, you are in Phase B (QA Watch Loop) — fix the failures, commit, push, and wait for QA to re-test.
+
+When both conditions are met:
 <promise>COMPLETE</promise>

@@ -17,18 +17,17 @@ export async function POST() {
       });
     }
 
-    let updated = 0;
+    let pricesInserted = 0;
     for (const product of topProducts) {
       try {
-        await refreshProductPrices(product.id, product.name, "us");
-        await refreshProductPrices(product.id, product.name, "kr");
-        updated++;
+        pricesInserted += await refreshProductPrices(product.id, product.name, "us");
+        pricesInserted += await refreshProductPrices(product.id, product.name, "kr");
       } catch {
         // Continue
       }
     }
 
-    return NextResponse.json({ success: true, data: { updated } });
+    return NextResponse.json({ success: true, data: { updated: pricesInserted } });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Price refresh failed" },

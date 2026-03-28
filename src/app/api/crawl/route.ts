@@ -34,9 +34,8 @@ export async function POST() {
     if (topProducts) {
       for (const product of topProducts) {
         try {
-          await refreshProductPrices(product.id, product.name, "us");
-          await refreshProductPrices(product.id, product.name, "kr");
-          pricesUpdated++;
+          pricesUpdated += await refreshProductPrices(product.id, product.name, "us");
+          pricesUpdated += await refreshProductPrices(product.id, product.name, "kr");
         } catch {
           // Continue with other products
         }
