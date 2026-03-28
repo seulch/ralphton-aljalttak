@@ -25,14 +25,14 @@ Minimal hardcoded dataset of 10-15 country-exclusive products as fallback.
 ### US-007: Landing page with direction selector
 Main landing page where users pick their travel direction.
 ---
-### US-008: Recipient profile input form
-Personalization form for describing the gift recipient.
+### US-008: Recipient profile input — simple and fast
+Minimal input page: only who the gift is for + optional free text. Category/budget filtering happens on the results page, not here.
 ---
 ### US-009: AI recommendation API with country-exclusive prioritization
 AI personalizes and ranks products from DB, strongly favoring country-exclusive items.
 ---
-### US-010: Product recommendation results page with price links
-Display recommendations as cards with country-exclusive badges, price comparison links (Skyscanner-style), and AI reasons.
+### US-010: Product recommendation results page with filters and price links
+Display AI-ranked recommendations with client-side filtering for category and budget. Price links always visible on each card.
 ---
 ### US-012: Shopping list with share link
 Add-to-list functionality with Supabase persistence and shareable link.
