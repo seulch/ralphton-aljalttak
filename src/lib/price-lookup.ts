@@ -56,8 +56,15 @@ export async function lookupPrice(
     // If no whitelisted results, take top 3 from any source
     const candidates = whitelisted.length > 0 ? whitelisted : allResults;
 
+    // Sanity filter: US prices should be < $500, KR prices < ₩500,000
+    const maxPrice = country === "us" ? 500 : 500_000;
+    const minPrice = country === "us" ? 0.5 : 100;
+
     const results = candidates
-      .filter((r) => (r.extracted_price || r.price) > 0)
+      .filter((r) => {
+        const p = r.extracted_price || r.price;
+        return p > minPrice && p < maxPrice;
+      })
       .sort(
         (a, b) =>
           (a.extracted_price || a.price || Infinity) -
