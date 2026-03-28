@@ -65,19 +65,6 @@ export default function Home() {
           between the US and Korea. Powered by real community recommendations.
         </p>
 
-        {/* Stats */}
-        <p className="mt-6 text-sm text-fg-muted">
-          Tracking{" "}
-          <span className="font-semibold text-accent-primary">
-            {stats.products}
-          </span>{" "}
-          country-exclusive gifts from{" "}
-          <span className="font-semibold text-accent-primary">
-            {stats.sources}
-          </span>{" "}
-          community sources
-        </p>
-
         {/* Direction cards */}
         <div className="mt-10 flex w-full max-w-2xl flex-col items-center gap-6 sm:flex-row sm:justify-center">
           <DirectionCard direction="us_to_kr" />
