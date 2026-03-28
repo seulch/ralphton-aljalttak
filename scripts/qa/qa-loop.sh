@@ -1,7 +1,6 @@
 #!/bin/bash
-# QA Loop — Autonomous testing with safe deadline
-# Waits for ralph iterations, tests, writes QA_TEST.md
-# Stops BETWEEN cycles (never mid-test)
+# QA Loop — Watches git commits, runs QA after each new commit
+# Works with ANY ralph implementation (OMC ralph, ralph-loop.sh, manual)
 # Usage: ./scripts/qa/qa-loop.sh [max_cycles]
 
 set -e
@@ -9,24 +8,29 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAX_CYCLES=${1:-10}
-DEADLINE=${AJT_DEADLINE:-$(($(date +%s) + 9600))}  # Default 2h40m if not set by start.sh
+DEADLINE=${AJT_DEADLINE:-$(($(date +%s) + 9600))}  # 2h40m default
+POLL_INTERVAL=30  # Check for new commits every 30 seconds
+MIN_WAIT=60       # Wait at least 60s between QA cycles (let ralph do multiple commits)
 
 cd "$PROJECT_DIR"
+
+LAST_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
 echo "========================================="
 echo "  QA Loop — AJT-gift"
 echo "  Max cycles: $MAX_CYCLES"
-echo "  Deadline: $(date -d @$DEADLINE '+%H:%M:%S' 2>/dev/null || date -r $DEADLINE '+%H:%M:%S' 2>/dev/null || echo 'in $((DEADLINE - $(date +%s)))s')"
-echo "  Watching for ralph loop output..."
+echo "  Watching git commits (poll every ${POLL_INTERVAL}s)"
+echo "  Starting commit: ${LAST_COMMIT:0:7}"
 echo "========================================="
 
 for cycle in $(seq 1 $MAX_CYCLES); do
-  # Check deadline BEFORE starting a new cycle
+  # Check deadline
   REMAINING=$((DEADLINE - $(date +%s)))
   if [ $REMAINING -le 0 ]; then
     echo ""
-    echo "⏰ DEADLINE REACHED — stopping QA safely before cycle $cycle"
-    git add -A && git commit -m "qa: deadline reached after cycle $((cycle-1))" 2>/dev/null && git push origin HEAD 2>/dev/null
+    echo "⏰ DEADLINE REACHED — stopping QA safely"
+    git add -A && git commit -m "qa: deadline reached after cycle $((cycle-1))" 2>/dev/null
+    git push origin HEAD 2>/dev/null
     exit 0
   fi
 
@@ -34,27 +38,36 @@ for cycle in $(seq 1 $MAX_CYCLES); do
   echo ""
   echo "======================================="
   echo "  QA Cycle $cycle of $MAX_CYCLES ($MINS_LEFT min remaining)"
+  echo "  Waiting for new commits..."
   echo "======================================="
 
-  # Wait for ralph signal, but also check deadline while waiting
-  echo "Waiting for ralph loop signal..."
+  # Wait for new commit(s) from ralph
   while true; do
     # Check deadline while waiting
     if [ $((DEADLINE - $(date +%s))) -le 0 ]; then
-      echo "⏰ DEADLINE REACHED while waiting for ralph"
-      git add -A && git commit -m "qa: deadline reached while waiting" 2>/dev/null && git push origin HEAD 2>/dev/null
+      echo "⏰ DEADLINE REACHED while waiting"
+      git add -A && git commit -m "qa: deadline reached while waiting" 2>/dev/null
+      git push origin HEAD 2>/dev/null
       exit 0
     fi
 
-    if [ -f "$PROJECT_DIR/.ralph-status" ]; then
-      STATUS=$(cat "$PROJECT_DIR/.ralph-status")
-      if [[ "$STATUS" == "RALPH_DONE" || "$STATUS" == ITERATION_* || "$STATUS" == "RALPH_MAX_ITERATIONS" || "$STATUS" == "RALPH_DEADLINE" ]]; then
-        echo "Ralph signal received: $STATUS"
-        rm -f "$PROJECT_DIR/.ralph-status"
-        break
-      fi
+    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+    if [ "$CURRENT_COMMIT" != "$LAST_COMMIT" ]; then
+      NEW_COMMITS=$(git log --oneline "$LAST_COMMIT".."$CURRENT_COMMIT" 2>/dev/null | wc -l)
+      echo "🔔 Detected $NEW_COMMITS new commit(s) since last QA"
+      echo "   Latest: $(git log --oneline -1)"
+      LAST_COMMIT=$CURRENT_COMMIT
+
+      # Wait a bit more — ralph might be doing multiple commits in a row
+      echo "   Waiting ${MIN_WAIT}s for ralph to finish current batch..."
+      sleep $MIN_WAIT
+
+      # Update in case more commits came in during wait
+      LAST_COMMIT=$(git rev-parse HEAD)
+      break
     fi
-    sleep 10
+
+    sleep $POLL_INTERVAL
   done
 
   # Check if there's code to test
@@ -63,24 +76,20 @@ for cycle in $(seq 1 $MAX_CYCLES); do
     continue
   fi
 
-  # Run QA agent — let it finish naturally
+  echo "🧪 Running QA agent..."
+
+  # Run QA agent — let it finish naturally (never kill mid-test)
   OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/QA_PROMPT.md" 2>&1 | tee /dev/stderr) || true
 
   # Check if QA passed everything
   if echo "$OUTPUT" | grep -q "<promise>QA_PASS</promise>"; then
     echo ""
-    echo "✅ QA passed all tests!"
-
-    if [[ "$STATUS" == "RALPH_DONE" || "$STATUS" == "RALPH_DEADLINE" ]]; then
-      echo "Both Ralph and QA complete. Ship it!"
-      exit 0
-    fi
+    echo "✅ QA passed all tests! Cycle $cycle complete."
+    echo "QA_PASS" > "$PROJECT_DIR/.qa-status"
+    exit 0
   fi
 
-  # Signal ralph that QA cycle is done
-  echo "QA_CYCLE_$cycle" > "$PROJECT_DIR/.qa-status"
-
-  echo "QA Cycle $cycle complete. Continuing..."
+  echo "QA Cycle $cycle complete. Issues found — waiting for ralph to fix..."
   sleep 2
 done
 
