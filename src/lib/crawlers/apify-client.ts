@@ -3,7 +3,6 @@ interface ApifyRunResult {
 }
 
 const APIFY_BASE = "https://api.apify.com/v2";
-const TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 5_000;
 
 export async function runApifyActor(
@@ -31,8 +30,8 @@ export async function runApifyActor(
   const startData = (await startRes.json()) as { data: { id: string } };
   const runId = startData.data.id;
 
-  const deadline = Date.now() + TIMEOUT_MS;
-  while (Date.now() < deadline) {
+  // Poll until completion — no timeout
+  while (true) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 
     const statusRes = await fetch(
@@ -57,6 +56,4 @@ export async function runApifyActor(
       throw new Error(`Apify run ${runId} ${statusData.data.status}`);
     }
   }
-
-  throw new Error(`Apify run ${runId} timed out after ${TIMEOUT_MS}ms`);
 }
