@@ -11,15 +11,23 @@ You are an autonomous QA tester. Your job is to thoroughly test everything Ralph
 - Glob `plans/done/*.md` for completed plans
 - Read `QA_TEST.md` if it exists (your previous results)
 
-### 2. Start the app
+### 2. Start the app and test frontend directly
 ```bash
-cd /path/to/project
+git pull origin main 2>/dev/null  # Get latest from Ralph
 pnpm install 2>/dev/null
 pnpm dev &
 sleep 8
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
 ```
 If the app doesn't start, document it as a critical failure.
+
+YOU are the only one who tests the live frontend. Ralph only builds and commits — YOU verify it actually works in the browser by:
+- Loading every page with curl and checking HTTP status + content
+- Calling every API endpoint with test data
+- Verifying product cards have real price links
+- Verifying filters work by checking HTML output with different query params
+- Testing the full user flow: landing → profile → results → list → share
+- After all tests, `pkill -f "next dev"` to free the port
 
 ### 3. Run tests
 
