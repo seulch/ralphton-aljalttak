@@ -25,8 +25,8 @@ const CARD_CONFIG = {
     title: "Going to the US",
     subtitle: "Find the best gifts to bring from Korea",
     gradient: "bg-gradient-to-b from-gray-800 to-surface-inverse",
-    textColor: "text-fg-inverse",
-    subColor: "text-gray-400",
+    textColor: "text-white",
+    subColor: "text-white",
   },
 };
 
