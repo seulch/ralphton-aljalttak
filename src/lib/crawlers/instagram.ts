@@ -22,29 +22,30 @@ export async function crawlInstagram(): Promise<RawCrawlData> {
   const urls: string[] = [];
 
   // Try Apify first
-  try {
-    const items = await runApifyActor("apify/instagram-hashtag-scraper", {
-      hashtags: HASHTAGS,
-      resultsLimit: 20,
-    });
+  if (process.env.APIFY_TOKEN) {
+    try {
+      const items = await runApifyActor("apify/instagram-hashtag-scraper", {
+        hashtags: HASHTAGS,
+        resultsLimit: 20,
+      });
 
-    for (const item of items) {
-      const caption = (item.caption as string) || "";
-      const shortCode = (item.shortCode as string) || "";
-      const url = (item.url as string) ||
-        (shortCode ? `https://www.instagram.com/p/${shortCode}/` : "");
-      if (caption.trim()) {
-        texts.push(caption);
-        if (url) urls.push(url);
+      for (const item of items) {
+        const caption = (item.caption as string) || "";
+        const shortCode = (item.shortCode as string) || "";
+        const url = (item.url as string) ||
+          (shortCode ? `https://www.instagram.com/p/${shortCode}/` : "");
+        if (caption.trim()) {
+          texts.push(caption);
+          if (url) urls.push(url);
+        }
       }
+    } catch (err) {
+      console.error("[instagram] Apify crawl error:", err);
     }
-  } catch (err) {
-    console.error("[instagram] Apify crawl error:", err);
   }
 
-  // Fallback: SerpAPI site:instagram.com searches
+  // Always fall back to SerpAPI if Apify returned nothing useful
   if (texts.length === 0) {
-    console.error("[instagram] Apify returned 0 results, falling back to SerpAPI");
     await serpapiFallback(texts, urls);
   }
 

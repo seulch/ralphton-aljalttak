@@ -18,12 +18,18 @@ export async function POST() {
     }
 
     let pricesInserted = 0;
-    for (const product of topProducts) {
+    // Process in batches of 5 with delay to prevent resource exhaustion
+    for (let i = 0; i < topProducts.length; i++) {
+      const product = topProducts[i];
       try {
         pricesInserted += await refreshProductPrices(product.id, product.name, "us");
         pricesInserted += await refreshProductPrices(product.id, product.name, "kr");
       } catch {
-        // Continue
+        // Continue with next product
+      }
+      // Small delay every 5 products to prevent server overload
+      if ((i + 1) % 5 === 0 && i < topProducts.length - 1) {
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
 

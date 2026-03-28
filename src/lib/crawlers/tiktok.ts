@@ -21,29 +21,30 @@ export async function crawlTikTok(): Promise<RawCrawlData> {
   const texts: string[] = [];
   const urls: string[] = [];
 
-  // Try Apify first (single call with first hashtag to avoid serial timeouts)
-  try {
-    const items = await runApifyActor("clockworks/free-tiktok-scraper", {
-      hashtags: [HASHTAGS[0]],
-      resultsPerPage: 20,
-      excludePinnedPosts: false,
-    });
+  // Try Apify first (single call to avoid serial timeouts)
+  if (process.env.APIFY_TOKEN) {
+    try {
+      const items = await runApifyActor("clockworks/free-tiktok-scraper", {
+        hashtags: [HASHTAGS[0]],
+        resultsPerPage: 20,
+        excludePinnedPosts: false,
+      });
 
-    for (const item of items) {
-      const text = (item.text as string) || (item.desc as string) || "";
-      const url = (item.webVideoUrl as string) || "";
-      if (text.trim()) {
-        texts.push(text);
-        if (url) urls.push(url);
+      for (const item of items) {
+        const text = (item.text as string) || (item.desc as string) || "";
+        const url = (item.webVideoUrl as string) || "";
+        if (text.trim()) {
+          texts.push(text);
+          if (url) urls.push(url);
+        }
       }
+    } catch (err) {
+      console.error("[tiktok] Apify error:", err);
     }
-  } catch (err) {
-    console.error("[tiktok] Apify error:", err);
   }
 
-  // Fallback: SerpAPI site:tiktok.com searches
+  // Always fall back to SerpAPI if Apify returned nothing useful
   if (texts.length === 0) {
-    console.error("[tiktok] Apify returned 0 results, falling back to SerpAPI");
     await serpapiFallback(texts, urls);
   }
 
