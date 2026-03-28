@@ -1,0 +1,21 @@
+# Ralph Progress Log
+Started: Fresh run
+---
+
+## Codebase Patterns
+- Supabase client: `import { supabase } from "@/lib/supabase/client"`
+- All crawlers follow: create crawl_run → try/catch → update crawl_run status
+- Apify (working free actors): reddit=trudax/reddit-scraper-lite, tiktok=clockworks/free-tiktok-scraper, instagram=apify/instagram-hashtag-scraper
+- Blocked platforms use SerpAPI site: queries: threads, x-twitter, oliveyoung, coupang
+- OpenAI: openai.chat.completions.create() with response_format: { type: "json_object" }
+- API routes: NextResponse.json() with try-catch
+- Products table requires UNIQUE(name, direction) constraint for upsert to work
+- Supabase migrations must be EXECUTED not just written as files
+- SerpAPI budget: 1000/mo, cache in price_cache (24h TTL)
+- Reddit lite output fields: title, body, link, communityName
+- TikTok output fields: text, desc, webVideoUrl, hashtags
+- Instagram output fields: caption, url, shortCode, hashtags
+- Price comparison links: use product_link from SerpAPI Google Shopping results, always target="_blank"
+- External links: always rel="noopener noreferrer"
+- cheerio is NOT needed for oliveyoung/coupang (they block direct fetch, use SerpAPI instead)
+---
