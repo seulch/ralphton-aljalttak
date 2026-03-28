@@ -201,29 +201,5 @@ export async function checkCrawlCooldown(): Promise<{
   canCrawl: boolean;
   reason?: string;
 }> {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const { data: recent } = await supabase
-    .from("crawl_runs")
-    .select("id")
-    .eq("phase", "pipeline")
-    .gte("started_at", oneHourAgo);
-
-  if (recent && recent.length > 0) {
-    return { canCrawl: false, reason: "Cooldown: wait 1 hour between crawls" };
-  }
-
-  const { data: today } = await supabase
-    .from("crawl_runs")
-    .select("id")
-    .eq("phase", "pipeline")
-    .gte("started_at", todayStart.toISOString());
-
-  if (today && today.length >= 3) {
-    return { canCrawl: false, reason: "Daily limit: max 3 crawls per day" };
-  }
-
   return { canCrawl: true };
 }
