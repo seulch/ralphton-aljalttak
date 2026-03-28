@@ -13,8 +13,10 @@ export async function runApifyActor(
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error("APIFY_TOKEN not configured");
 
+  // Apify uses ~ separator in actor IDs (e.g., trudax~reddit-scraper-lite)
+  const normalizedId = actorId.replace("/", "~");
   const startRes = await fetch(
-    `${APIFY_BASE}/acts/${actorId}/runs?token=${token}`,
+    `${APIFY_BASE}/acts/${normalizedId}/runs?token=${token}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
