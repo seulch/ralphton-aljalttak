@@ -26,7 +26,7 @@ const CARD_CONFIG = {
     subtitle: "Find the best gifts to bring from Korea",
     gradient: "bg-gradient-to-b from-gray-800 to-surface-inverse",
     textColor: "text-fg-inverse",
-    subColor: "text-fg-muted",
+    subColor: "text-gray-400",
   },
 };
 
