@@ -1,0 +1,99 @@
+# AJT-gift — Ralph Build Progress
+
+## Iteration 1: Full MVP Implementation
+
+### Stories Completed
+- US-001: Project scaffolding + Supabase schema ✅
+  - 5 tables created and verified via REST API (HTTP 200)
+  - Types in src/types/database.ts matching all tables
+  - Dependencies installed, typecheck passes
+
+- US-002: Phase 1 SNS crawlers ✅
+  - reddit.ts (Apify trudax/reddit-scraper-lite)
+  - tiktok.ts (Apify clockworks/free-tiktok-scraper)
+  - instagram.ts (Apify apify/instagram-hashtag-scraper)
+  - apify-client.ts shared helper with timeout + polling
+
+- US-003: Community crawlers ✅
+  - youtube.ts (YouTube Data API v3)
+  - google-search.ts (SerpAPI organic results)
+  - naver.ts (Naver Search API blog)
+
+- US-004: AI product extraction ✅
+  - ai-extractor.ts with GPT-4o country-exclusive focus
+  - pipeline.ts orchestrates Phase 1 → AI extraction → DB upsert
+  - Rate limiting: 1h cooldown, 3x/day
+
+- US-005: Phase 2 price lookup ✅
+  - price-lookup.ts with SerpAPI Google Shopping
+  - Max 3 cheapest per country from whitelisted stores
+  - 24h cache with TTL
+
+- US-006: Fallback seed data ✅
+  - 12 country-exclusive products (6 US→KR, 6 KR→US)
+  - Auto-inserts when DB < 10 products
+  - Verified: GET /api/products returns correct data
+
+- US-007: Landing page ✅
+  - Direction cards (US→KR, KR→US) with gradients
+  - Live stats counter
+  - Refresh Trends button with cooldown display
+  - Design matches web-design.pen tokens
+
+- US-008: Profile form ✅
+  - Age/Gender/Relationship chip selectors
+  - Free text input
+  - Skip option ("Show me everything")
+  - URL params for shareability
+
+- US-009: AI recommendation API ✅
+  - POST /api/recommend with GPT-4o personalization
+  - Fallback to trending_score sort if OpenAI unavailable
+  - Country-exclusive prioritization in system prompt
+
+- US-010: Results page ✅
+  - Category filter chips (client-side)
+  - Budget filter chips (client-side)
+  - Sort dropdown (Best Match/Exclusive First/Price)
+  - Product grid: 1/2/3 columns responsive
+  - Product cards with tags, prices, buy links
+
+- US-012: Shopping list ✅
+  - Add to List from product cards
+  - Checkbox, quantity, remove
+  - Summary sidebar with dual-currency totals
+  - Share link with copy-to-clipboard
+
+- US-013: Currency + tags + polish ✅
+  - Exchange rate API (exchangerate-api.com, 1h cache, fallback 1350)
+  - Dual currency on all prices
+  - Dynamic tags: exclusive/SNS/community
+  - Footer: "Built at Ralphthon SF 2026"
+
+### Build Verification
+- pnpm typecheck: PASS
+- pnpm build: PASS (all 15 routes compiled)
+- Dev server: all pages return HTTP 200
+- Products API: returns correct fallback data
+- Exchange rate: working (live rate)
+
+### Design Tokens Applied (from web-design.pen)
+- accent-primary: #2563EB
+- accent-green: #16A34A
+- accent-orange: #EA580C
+- fg-primary: #111827
+- fg-secondary: #6B7280
+- surface-primary: #FFFFFF
+- surface-secondary: #F3F4F6
+- Hero gradient: blue-50 → white
+- ProductCard: white bg, rounded-2xl, vertical layout
+
+### Files Created (40+)
+- src/lib/crawlers/{index,apify-client,reddit,tiktok,instagram,youtube,google-search,naver,ai-extractor,pipeline}.ts
+- src/lib/{supabase/client,utils,price-lookup}.ts
+- src/app/api/{crawl,crawl/sns,crawl/community,crawl/prices,recommend,price-refresh,products,exchange-rate,list,list/[token]}/route.ts
+- src/app/{page,layout,recommend/page,list/page,list/[token]/page}.tsx
+- src/components/{NavBar,DirectionCard,ProfileForm,FilterChips,ProductCard,PriceLinks,SkeletonCard}.tsx
+- src/data/fallback-products.ts
+- src/types/database.ts
+- supabase/migrations/001_initial_schema.sql
