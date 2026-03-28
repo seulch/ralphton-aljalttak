@@ -2,20 +2,52 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { NavBar } from "@/components/NavBar";
-import type { ShoppingList, ShoppingListItem, Product } from "@/types/database";
+import type { ShoppingList, ShoppingListItem, Product, ProductPrice } from "@/types/database";
 import { formatUSD, formatKRW } from "@/lib/utils";
 
 interface ListItemWithProduct extends ShoppingListItem {
-  products: Product | null;
+  products: (Product & { prices?: ProductPrice[] }) | null;
 }
 
 interface ListWithItems extends ShoppingList {
   shopping_list_items: ListItemWithProduct[];
 }
 
+function getBestPrice(item: ListItemWithProduct): { store: string; price: string; link: string | null } | null {
+  const product = item.products;
+  if (!product) return null;
+
+  const prices = product.prices || [];
+  // Pick cheapest US price first, then KR
+  const usPrices = prices.filter((p) => p.country === "us").sort((a, b) => a.price - b.price);
+  const krPrices = prices.filter((p) => p.country === "kr").sort((a, b) => a.price - b.price);
+
+  if (usPrices.length > 0) {
+    return { store: usPrices[0].store_name, price: formatUSD(usPrices[0].price), link: usPrices[0].product_link };
+  }
+  if (product.estimated_us_price) {
+    return { store: "Estimated", price: formatUSD(product.estimated_us_price), link: null };
+  }
+  if (krPrices.length > 0) {
+    return { store: krPrices[0].store_name, price: formatKRW(krPrices[0].price), link: krPrices[0].product_link };
+  }
+  if (product.estimated_kr_price) {
+    return { store: "Estimated", price: formatKRW(product.estimated_kr_price), link: null };
+  }
+  return null;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  food: "Food",
+  beauty: "Beauty",
+  health: "Health",
+  tech: "Tech",
+  fashion: "Fashion",
+  home: "Home",
+};
+
 export default function ListPage() {
   const [lists, setLists] = useState<ListWithItems[]>([]);
-  const [exchangeRate, setExchangeRate] = useState(1350);
   const [copied, setCopied] = useState(false);
 
   const getAnonId = useCallback(() => {
@@ -39,27 +71,7 @@ export default function ListPage() {
 
   useEffect(() => {
     fetchLists();
-    fetch("/api/exchange-rate")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) setExchangeRate(d.data.rate);
-      })
-      .catch(() => {});
   }, [fetchLists]);
-
-  const handleToggle = async (itemId: string, checked: boolean) => {
-    await fetch("/api/list", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "update-item",
-        anonymousId: getAnonId(),
-        itemId,
-        checked: !checked,
-      }),
-    });
-    fetchLists();
-  };
 
   const handleRemove = async (itemId: string) => {
     await fetch("/api/list", {
@@ -74,36 +86,40 @@ export default function ListPage() {
     fetchLists();
   };
 
-  const handleShare = (shareToken: string) => {
-    const url = `${window.location.origin}/list/${shareToken}`;
-    navigator.clipboard.writeText(url);
+  const list = lists[0];
+  const items = list?.shopping_list_items || [];
+  const directionLabel = list?.direction === "kr_to_us" ? "KR to US" : "US to KR";
+  const directionArrow = list?.direction === "kr_to_us" ? "KR -> US" : "US -> KR";
+
+  const handleCopyMarkdown = () => {
+    const lines = [`## My Gift List (${directionArrow})`, ""];
+    items.forEach((item) => {
+      const product = item.products;
+      const name = product?.name || item.custom_name || "Unknown item";
+      const best = getBestPrice(item);
+      const storePart = best ? ` -- ${best.store}` : "";
+      lines.push(`- ${name}${storePart}`);
+    });
+    navigator.clipboard.writeText(lines.join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const list = lists[0];
-  const items = list?.shopping_list_items || [];
-
-  // Calculate totals
-  const totalUSD = items.reduce((sum, item) => {
-    const price = item.products?.estimated_us_price || 0;
-    return sum + price * item.quantity;
-  }, 0);
-
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <NavBar cartCount={items.length} />
 
-      <main className="flex flex-1 gap-8 bg-gradient-to-b from-blue-50 to-white px-6 py-10 lg:px-12">
+      {/* Blue accent bar */}
+      <div className="h-1 bg-accent-primary" />
+
+      <main className="flex flex-1 gap-8 px-6 py-10 lg:px-12">
         {/* List items */}
         <div className="flex flex-1 flex-col gap-5">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-extrabold text-fg-primary">
-              🛒 My Gift List
-            </h1>
-            <span className="text-sm text-fg-muted">
-              {items.length} items
-            </span>
+          <div>
+            <h1 className="text-2xl font-extrabold text-fg-primary">My List</h1>
+            <p className="mt-1 text-sm text-fg-muted">
+              {directionLabel} · {items.length} items saved
+            </p>
           </div>
 
           {items.length === 0 ? (
@@ -118,54 +134,49 @@ export default function ListPage() {
               </a>
             </div>
           ) : (
-            <div className="flex flex-col gap-px rounded-xl border border-border-default bg-border-default overflow-hidden">
+            <div className="flex flex-col divide-y divide-gray-200 rounded-xl bg-white shadow-sm">
               {items.map((item) => {
                 const product = item.products;
+                const best = getBestPrice(item);
+                const categoryLabel = CATEGORY_LABELS[product?.category || ""] || "Item";
+
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-4 bg-white px-5 py-4"
+                    className="flex items-center justify-between px-6 py-4"
                   >
-                    <button
-                      onClick={() => handleToggle(item.id, item.checked)}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                        item.checked
-                          ? "border-accent-primary bg-accent-primary text-white"
-                          : "border-border-default"
-                      }`}
-                    >
-                      {item.checked && "✓"}
-                    </button>
-                    <div className="flex flex-1 flex-col">
-                      <span
-                        className={`text-sm font-medium ${
-                          item.checked
-                            ? "text-fg-muted line-through"
-                            : "text-fg-primary"
-                        }`}
-                      >
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-fg-primary">
                         {product?.name || item.custom_name || "Unknown item"}
                       </span>
-                      {product?.name_localized && (
-                        <span className="text-xs text-fg-muted">
-                          {product.name_localized}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm text-fg-secondary">
-                      ×{item.quantity}
-                    </span>
-                    {product?.estimated_us_price && (
-                      <span className="text-sm font-medium text-fg-primary">
-                        {formatUSD(product.estimated_us_price * item.quantity)}
+                      <span className="text-xs text-fg-muted">
+                        {categoryLabel}
+                        {best ? ` · ~${best.price} at ${best.store}` : ""}
                       </span>
-                    )}
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      className="text-fg-muted hover:text-accent-red"
-                    >
-                      ✕
-                    </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {best?.link && best.link !== "#" ? (
+                        <a
+                          href={best.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-accent-primary hover:underline"
+                        >
+                          {best.store} →
+                        </a>
+                      ) : best?.store && best.store !== "Estimated" ? (
+                        <span className="text-sm font-medium text-fg-muted">
+                          {best.store}
+                        </span>
+                      ) : null}
+                      <button
+                        onClick={() => handleRemove(item.id)}
+                        className="text-fg-muted hover:text-accent-red"
+                        title="Remove item"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -173,75 +184,36 @@ export default function ListPage() {
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar - Copy as Markdown */}
         {items.length > 0 && (
           <aside className="hidden w-[380px] shrink-0 lg:block">
             <div className="sticky top-24 flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm">
               <h3 className="text-lg font-extrabold text-fg-primary">
-                Summary
+                Copy as Markdown
               </h3>
               <p className="text-sm text-fg-secondary">
-                Your curated gift list with estimated prices.
+                Copy your list and paste it anywhere.
               </p>
-              <div className="flex flex-col gap-2.5">
-                {items.slice(0, 5).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between text-sm"
-                  >
-                    <span className="truncate text-fg-secondary">
-                      {item.products?.name || "Item"} ×{item.quantity}
-                    </span>
-                    <span className="font-medium text-fg-primary">
-                      {item.products?.estimated_us_price
-                        ? formatUSD(
-                            item.products.estimated_us_price * item.quantity
-                          )
-                        : "—"}
-                    </span>
-                  </div>
-                ))}
-                {items.length > 5 && (
-                  <span className="text-xs text-fg-muted">
-                    +{items.length - 5} more items
-                  </span>
-                )}
+              <div className="relative rounded-lg bg-gray-50 p-4">
+                <button
+                  onClick={handleCopyMarkdown}
+                  className="absolute right-3 top-3 flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-gray-50"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-fg-secondary">
+{`## My Gift List (${directionArrow})
+${items.map((item) => {
+  const name = item.products?.name || item.custom_name || "Unknown";
+  const best = getBestPrice(item);
+  const store = best?.store || "";
+  return `- ${name}${store ? ` -- ${store}` : ""}`;
+}).join("\n")}`}
+                </pre>
               </div>
-              <div className="h-px bg-surface-secondary" />
-              <div className="flex justify-between">
-                <span className="font-bold text-fg-primary">Total</span>
-                <div className="text-right">
-                  <span className="font-bold text-fg-primary">
-                    {formatUSD(totalUSD)}
-                  </span>
-                  <span className="ml-1 text-sm text-fg-muted">
-                    ({formatKRW(totalUSD * exchangeRate)})
-                  </span>
-                </div>
-              </div>
-
-              {totalUSD > 0 && (
-                <div className="rounded-xl bg-green-50 px-4 py-3">
-                  <p className="text-sm font-semibold text-accent-green">
-                    💰 Country-exclusive gifts — can&#39;t buy these online!
-                  </p>
-                </div>
-              )}
-
-              {/* Share */}
-              <div className="flex flex-col gap-2.5">
-                <h4 className="text-sm font-semibold text-fg-primary">
-                  Share this list
-                </h4>
-                {list && (
-                  <button
-                    onClick={() => handleShare(list.share_token)}
-                    className="w-full rounded-lg bg-accent-primary py-2.5 text-sm font-semibold text-fg-inverse transition-colors hover:bg-blue-700"
-                  >
-                    {copied ? "Copied! ✓" : "📋 Copy Share Link"}
-                  </button>
-                )}
-              </div>
+              <p className="text-xs text-fg-muted">
+                Hand it over to ChatGPT or Codex.
+              </p>
             </div>
           </aside>
         )}
@@ -251,7 +223,7 @@ export default function ListPage() {
         <span className="text-[13px] text-fg-muted">
           Built at Ralphthon SF 2026
         </span>
-        <span className="text-[13px] text-fg-muted">AJT-gift</span>
+        <span className="text-[13px] text-fg-muted">AJT Gifts</span>
       </footer>
     </div>
   );

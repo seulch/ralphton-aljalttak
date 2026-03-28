@@ -17,6 +17,7 @@ interface ProductCardProps {
   exchangeRate: number;
   onAddToList: (productId: string) => void;
   onRefreshPrice?: (productId: string) => void;
+  isAdded?: boolean;
 }
 
 export function ProductCard({
@@ -24,6 +25,7 @@ export function ProductCard({
   exchangeRate,
   onAddToList,
   onRefreshPrice,
+  isAdded = false,
 }: ProductCardProps) {
   const dirLabel =
     product.direction === "us_to_kr" ? "Only in US" : "Only in Korea";
@@ -85,9 +87,14 @@ export function ProductCard({
         {/* Actions */}
         <button
           onClick={() => onAddToList(product.id)}
-          className="mt-1 w-full rounded-lg bg-accent-primary py-2 text-sm font-semibold text-fg-inverse transition-colors hover:bg-blue-700"
+          disabled={isAdded}
+          className={`mt-1 w-full rounded-lg py-2 text-sm font-semibold transition-colors ${
+            isAdded
+              ? "bg-green-100 text-green-700 cursor-default"
+              : "bg-accent-primary text-fg-inverse hover:bg-blue-700"
+          }`}
         >
-          + Add to List
+          {isAdded ? "Added to List" : "+ Add to List"}
         </button>
       </div>
     </div>

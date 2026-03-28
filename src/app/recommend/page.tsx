@@ -38,8 +38,10 @@ function RecommendContent() {
   );
   const [selectedBudget, setSelectedBudget] = useState("all");
   const [selectedSort, setSelectedSort] = useState("best");
+  const [cartCount, setCartCount] = useState(0);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
-  // Fetch exchange rate
+  // Fetch exchange rate and cart count
   useEffect(() => {
     fetch("/api/exchange-rate")
       .then((r) => r.json())
@@ -47,6 +49,24 @@ function RecommendContent() {
         if (d.success) setExchangeRate(d.data.rate);
       })
       .catch(() => {});
+
+    // Fetch existing cart count
+    let anonId = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("anon_id="))
+      ?.split("=")[1];
+    if (anonId) {
+      fetch(`/api/list?anonymousId=${anonId}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.data?.[0]) {
+            const items = d.data[0].shopping_list_items || [];
+            setCartCount(items.length);
+            setAddedIds(new Set(items.map((i: { product_id: string }) => i.product_id)));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Fetch recommendations
@@ -81,7 +101,7 @@ function RecommendContent() {
         anonId = crypto.randomUUID();
         document.cookie = `anon_id=${anonId}; path=/; max-age=31536000`;
       }
-      await fetch("/api/list", {
+      const res = await fetch("/api/list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -91,6 +111,11 @@ function RecommendContent() {
           direction,
         }),
       });
+      const data = await res.json();
+      if (data.success) {
+        setCartCount((prev) => prev + 1);
+        setAddedIds((prev) => new Set(prev).add(productId));
+      }
     },
     [direction]
   );
@@ -198,7 +223,7 @@ function RecommendContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <NavBar />
+      <NavBar cartCount={cartCount} />
 
       {/* Meta banner */}
       <div className="flex items-center gap-2 bg-gradient-to-b from-blue-50 to-blue-100 px-6 py-3 lg:px-12">
@@ -250,6 +275,7 @@ function RecommendContent() {
                 exchangeRate={exchangeRate}
                 onAddToList={handleAddToList}
                 onRefreshPrice={handleRefreshPrice}
+                isAdded={addedIds.has(product.id)}
               />
             ))}
           </div>
@@ -278,6 +304,7 @@ function RecommendContent() {
                   product={product}
                   exchangeRate={exchangeRate}
                   onAddToList={handleAddToList}
+                  isAdded={addedIds.has(product.id)}
                 />
               ))}
             </div>

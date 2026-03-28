@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const { data: lists } = await supabase
     .from("shopping_lists")
-    .select("*, shopping_list_items(*, products(*))")
+    .select("*, shopping_list_items(*, products(*, prices:product_prices(*)))")
     .eq("anonymous_id", anonymousId)
     .order("updated_at", { ascending: false });
 
