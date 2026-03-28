@@ -3,7 +3,7 @@ interface ApifyRunResult {
 }
 
 const APIFY_BASE = "https://api.apify.com/v2";
-const TIMEOUT_MS = 120_000;
+const TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 5_000;
 
 export async function runApifyActor(
