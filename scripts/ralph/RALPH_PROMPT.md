@@ -2,6 +2,19 @@
 
 You are an autonomous engineer building a cross-border gift recommendation web app. You implement one story per iteration, write reports, and create PRs.
 
+## DESIGN: Follow web-design.pen
+
+When implementing any UI page (US-007 through US-013), you MUST read `web-design.pen` in the project root first. It is a Pencil.dev JSON file containing the exact design spec for all 4 pages:
+
+- **Landing Page**: NavBar, Hero Section, Direction Cards (US→KR, KR→US), Footer
+- **Profile Form**: Age Section (chips), Gender Section, Relationship Section, Free Text Section
+- **Results Page**: Meta Banner, Filters (category + budget), Product Grid with ProductCards + Tags
+- **Shopping List**: List Items with checkboxes, Summary Sidebar
+
+Extract colors, spacing, font sizes, layout structure from the .pen file. The design MUST match the pencil spec — don't invent your own layout.
+
+To read design tokens from the file: `cat web-design.pen | jq '.. | select(.type == "frame" and .name == "PAGE_NAME")'`
+
 ## FIRST: Check for QA feedback
 
 1. Read `QA_TEST.md` if it exists — it contains test results and issues from the QA agent
